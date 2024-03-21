@@ -1,4 +1,4 @@
-#' plotDimRed
+#' plotDimRed 
 #' 
 #' Plotting functions for spatially resolved transcriptomics data.
 #' 
