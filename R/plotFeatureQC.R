@@ -2,11 +2,11 @@
 #' 
 #' Plotting functions for spatial transcriptomics data.
 #' 
-#' Function to create quality control (QC) plots for spatial transcriptomics
-#' data.
+#' Function to create feature-level quality control (QC) plots for spatial
+#' transcriptomics data.
 #' 
-#' The following types of QC plots are available for feature-level QC (see
-#' \code{\link{plotSpotQC}} for spot-level or cell-level QC):
+#' The following types of feature-level (i.e. gene-level) QC plots are
+#' available:
 #' 
 #' \itemize{
 #' \item Histogram (\code{plot_type = "histogram"}) for a single QC metric, e.g.
@@ -16,6 +16,9 @@
 #' UMI counts across all spots per feature. The violin plot can optionally
 #' highlight selected features, e.g. low abundance features.
 #' }
+#' 
+#' For observation-level (i.e. spot-level or cell-level) QC plots, see
+#' \code{\link{plotObsQC}}.
 #' 
 #' 
 #' @param spe Input data, assumed to be a \code{SpatialExperiment} or
@@ -46,7 +49,7 @@
 #' 
 #' 
 #' @importFrom SummarizedExperiment rowData
-#' @importFrom ggplot2 ggplot aes_string geom_histogram geom_violin geom_jitter
+#' @importFrom ggplot2 ggplot geom_histogram geom_violin geom_jitter
 #'   scale_fill_manual scale_color_manual scale_x_continuous scale_y_continuous
 #'   xlab labs theme_bw theme element_blank
 #' 
@@ -94,19 +97,19 @@ plotFeatureQC <- function(spe, plot_type = c("histogram", "violin"),
     
     # histogram showing 'x_metric', optionally colored by 'annotate'
     if (!is.null(annotate)) {
-      p <- ggplot(df, aes_string(x = x_metric, fill = annotate)) + 
+      p <- ggplot(df, aes(x = get(x_metric), fill = get(annotate))) + 
         geom_histogram(bins = n_bins, color = "#e9ecef", alpha = 0.6, 
                        position = "identity") + 
         scale_fill_manual(values = c("gray70", "red")) + 
-        xlab(x_metric) + 
         labs(fill = annotate)
     } else if (is.null(annotate)) {
-      p <- ggplot(df, aes_string(x = x_metric)) + 
+      p <- ggplot(df, aes(x = get(x_metric))) + 
         geom_histogram(bins = n_bins, color = "#e9ecef", alpha = 0.6, 
                        position = "identity") + 
-        scale_fill_manual(values = c("gray70")) + 
-        xlab(x_metric)
+        scale_fill_manual(values = c("gray70"))
     }
+    
+    p <- p + xlab(x_metric)
     
     if (scale_log1p) {
       p <- p + scale_x_continuous(transform = "log1p")
@@ -122,12 +125,14 @@ plotFeatureQC <- function(spe, plot_type = c("histogram", "violin"),
     
     df[["dummy"]] <- rep(" ", nrow(df))
     
-    p <- ggplot(df, aes_string(x = "dummy", y = x_metric, fill = "dummy")) + 
+    p <- ggplot(df, aes(x = get("dummy"), y = get(x_metric), fill = get("dummy"))) + 
       geom_violin(trim = TRUE, alpha = 0.9) + 
       scale_fill_manual(values = c("gray70")) + 
-      ylab(x_metric) + 
+      labs(x = "dummy", 
+           y = x_metric, 
+           fill = "dummy") + 
       theme_bw() + 
-      theme(legend.position="none", 
+      theme(legend.position = "none", 
             panel.grid = element_blank())
     
     if (is.null(annotate)) {
@@ -137,8 +142,9 @@ plotFeatureQC <- function(spe, plot_type = c("histogram", "violin"),
     } else if (!is.null(annotate)) {
       # violins for 'x_metric', colored by 'annotate' (colors in order FALSE, TRUE)
       p <- p + 
-        geom_jitter(aes_string(color = annotate), size = point_size) + 
-        scale_color_manual(values = c("black", "red"))
+        geom_jitter(aes(color = get(annotate)), size = point_size) + 
+        scale_color_manual(values = c("black", "red")) + 
+        labs(color = annotate)
     }
     
     if (scale_log1p) {

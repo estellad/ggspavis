@@ -1,12 +1,12 @@
-#' plotSpotQC
+#' plotObsQC
 #' 
 #' Plotting functions for spatial transcriptomics data.
 #' 
-#' Function to create quality control (QC) plots for spatial transcriptomics
-#' data.
+#' Function to create observation-level quality control (QC) plots for spatial
+#' transcriptomics data.
 #' 
-#' The following types of QC plots are available for spot-level or cell-level QC
-#' (see \code{\link{plotFeatureQC}} for feature-level QC):
+#' The following types of observation-level (i.e. spot-level or cell-level) QC
+#' plots are available:
 #' 
 #' \itemize{
 #' \item Histogram (\code{plot_type = "histogram"}) for a single QC metric, e.g.
@@ -22,6 +22,9 @@
 #' number of UMI counts per spot. For number of counts per spot, the violin plot
 #' can optionally highlight selected spots, e.g. spots with low library size.
 #' }
+#' 
+#' For feature-level (i.e. gene-level) QC plots, see
+#' \code{\link{plotFeatureQC}}.
 #' 
 #' 
 #' @param spe Input data, assumed to be a \code{SpatialExperiment} or
@@ -92,10 +95,10 @@
 #' 
 #' @importFrom SpatialExperiment spatialCoords
 #' @importFrom SummarizedExperiment rowData colData
-#' @importFrom ggplot2 ggplot aes_string geom_histogram geom_point geom_vline
-#'   geom_hline geom_smooth geom_violin geom_jitter scale_fill_manual
-#'   scale_color_manual xlab ylab labs coord_fixed theme_bw theme element_text
-#'   element_blank guides scale_y_reverse
+#' @importFrom ggplot2 ggplot geom_histogram geom_point geom_vline geom_hline
+#'   geom_smooth geom_violin geom_jitter scale_fill_manual scale_color_manual
+#'   xlab labs coord_fixed theme_bw theme element_text element_blank guides
+#'   scale_y_reverse
 #' @importFrom ggside geom_xsidehistogram geom_ysidehistogram
 #' 
 #' 
@@ -110,21 +113,21 @@
 #' colData(spe)$sum <- colSums(counts(spe))
 #' colData(spe)$low_libsize <- colData(spe)$sum < 400
 #' 
-#' plotSpotQC(spe, plot_type = "histogram", x_metric = "sum", annotate = "low_libsize")
-#' plotSpotQC(spe, plot_type = "scatter", x_metric = "sum", y_metric = "cell_count")
-#' plotSpotQC(spe, plot_type = "spot", annotate = "low_libsize", in_tissue = "in_tissue")
-#' plotSpotQC(spe, plot_type = "violin", x_metric = "sum", annotate = "low_libsize")
+#' plotObsQC(spe, plot_type = "histogram", x_metric = "sum", annotate = "low_libsize")
+#' plotObsQC(spe, plot_type = "scatter", x_metric = "sum", y_metric = "cell_count")
+#' plotObsQC(spe, plot_type = "spot", annotate = "low_libsize", in_tissue = "in_tissue")
+#' plotObsQC(spe, plot_type = "violin", x_metric = "sum", annotate = "low_libsize")
 #' 
-plotSpotQC <- function(spe, 
-                       plot_type = c("histogram", "scatter", "spot", "violin"), 
-                       x_coord = NULL, y_coord = NULL, 
-                       x_metric = NULL, y_metric = NULL, 
-                       x_threshold = NULL, y_threshold = NULL, 
-                       trend = TRUE, marginal = TRUE, 
-                       annotate = NULL, in_tissue = NULL, 
-                       legend_point_size = 3, 
-                       n_bins = 100, point_size = 0.3, 
-                       y_reverse = TRUE) {
+plotObsQC <- function(spe, 
+                      plot_type = c("histogram", "scatter", "spot", "violin"), 
+                      x_coord = NULL, y_coord = NULL, 
+                      x_metric = NULL, y_metric = NULL, 
+                      x_threshold = NULL, y_threshold = NULL, 
+                      trend = TRUE, marginal = TRUE, 
+                      annotate = NULL, in_tissue = NULL, 
+                      legend_point_size = 3, 
+                      n_bins = 100, point_size = 0.3, 
+                      y_reverse = TRUE) {
   
   # check validity of arguments
   plot_type <- match.arg(plot_type)
@@ -145,13 +148,14 @@ plotSpotQC <- function(spe,
     # select default columns of x and y coordinates
     if (is.null(x_coord)) x_coord <- colnames(spatialCoords(spe))[1]
     if (is.null(y_coord)) y_coord <- colnames(spatialCoords(spe))[2]
-    df <- cbind.data.frame(colData(spe), spatialCoords(spe))
+    df <- cbind(data.frame(colData(spe), check.names = FALSE), 
+                data.frame(spatialCoords(spe), check.names = FALSE))
   } else if (is(spe, "SingleCellExperiment")) {
     if (is.null(x_coord) || is.null(y_coord)) {
       stop("Please provide 'x_coord' and 'y_coord' arguments to specify ", 
            "columns in colData containing x and y coordinates.")
     }
-    df <- as.data.frame(colData(spe))
+    df <- data.frame(colData(spe), check.names = FALSE)
   }
   
   # for histogram, spot, or violin plots
@@ -175,21 +179,19 @@ plotSpotQC <- function(spe,
     
     # histogram showing 'x_metric', optionally colored by 'annotate'
     if (!is.null(annotate)) {
-      p <- ggplot(df, aes_string(x = x_metric, fill = annotate)) + 
+      p <- ggplot(df, aes(x = get(x_metric), fill = get(annotate))) + 
         geom_histogram(bins = n_bins, color = "#e9ecef", alpha = 0.6, 
                        position = "identity") + 
         scale_fill_manual(values = c("gray70", "red")) + 
-        xlab(x_metric) + 
         labs(fill = annotate)
     } else if (is.null(annotate)) {
-      p <- ggplot(df, aes_string(x = x_metric)) + 
+      p <- ggplot(df, aes(x = get(x_metric))) + 
         geom_histogram(bins = n_bins, color = "#e9ecef", alpha = 0.6, 
                        position = "identity") + 
-        scale_fill_manual(values = c("gray70")) + 
-        xlab(x_metric) 
+        scale_fill_manual(values = c("gray70"))
     }
     
-    p <- p + theme_bw()
+    p <- p + xlab(x_metric) + theme_bw()
   }
   
   
@@ -198,8 +200,10 @@ plotSpotQC <- function(spe,
   
   if (plot_type == "scatter") {
     
-    p <- ggplot(df, aes_string(x = x_metric, y = y_metric)) + 
+    p <- ggplot(df, aes(x = get(x_metric), y = get(y_metric))) + 
       geom_point(size = point_size) + 
+      labs(x = x_coord, 
+           y = y_coord) + 
       theme_bw()
     
     if (!is.null(x_threshold)) {
@@ -229,18 +233,21 @@ plotSpotQC <- function(spe,
     
     # spots at 'x_coord' and 'y_coord', optionally colored by 'annotate'
     if (!is.null(annotate)) {
-      p <- ggplot(df, aes_string(x = x_coord, y = y_coord, color = annotate)) + 
+      p <- ggplot(df, aes(x = get(x_coord), y = get(y_coord), color = get(annotate))) + 
         geom_point(size = point_size) + 
         scale_color_manual(values = c("gray85", "red")) + 
+        labs(color = annotate) + 
         guides(color = guide_legend(override.aes = list(size = legend_point_size)))
     } else if (is.null(annotate)) {
-      p <- ggplot(df, aes_string(x = x_coord, y = y_coord)) + 
+      p <- ggplot(df, aes(x = get(x_coord), y = get(y_coord))) + 
         geom_point(size = point_size) + 
         scale_color_manual(values = "gray85")
     }
     
     p <- p + 
       coord_fixed() + 
+      labs(x = x_coord, 
+           y = y_coord) + 
       theme_bw() + 
       theme(panel.grid = element_blank(), 
             axis.title = element_blank(), 
@@ -259,12 +266,14 @@ plotSpotQC <- function(spe,
     
     df[["dummy"]] <- rep(" ", nrow(df))
     
-    p <- ggplot(df, aes_string(x = "dummy", y = x_metric, fill = "dummy")) + 
+    p <- ggplot(df, aes(x = get("dummy"), y = get(x_metric), fill = get("dummy"))) + 
       geom_violin(trim = TRUE, alpha = 0.9) + 
       scale_fill_manual(values = c("gray70")) + 
-      ylab(x_metric) + 
+      labs(x = "dummy", 
+           y = x_metric, 
+           fill = "dummy") + 
       theme_bw() + 
-      theme(legend.position="none", 
+      theme(legend.position = "none", 
             panel.grid = element_blank())
     
     if (is.null(annotate)) {
@@ -274,8 +283,9 @@ plotSpotQC <- function(spe,
     } else if (!is.null(annotate)) {
       # violins for 'x_metric', colored by 'annotate' (colors in order FALSE, TRUE)
       p <- p + 
-        geom_jitter(aes_string(color = annotate), size = point_size) + 
-        scale_color_manual(values = c("black", "red"))
+        geom_jitter(aes(color = get(annotate)), size = point_size) + 
+        scale_color_manual(values = c("black", "red")) + 
+        labs(color = annotate)
     }
   }
   
@@ -284,11 +294,21 @@ plotSpotQC <- function(spe,
 }
 
 
-#' @rdname plotSpotQC
+#' @rdname plotObsQC
 #' @param ... Not used.
 #' @export
 plotQC <- function(...) {
   # message when using deprecated function name
-  message("The function plotQC() has been replaced with plotSpotQC() and ", 
-          "plotFeatureQC(). Please use one of these functions instead.")
+  message("The function plotQC() has been replaced with plotObsQC() and ", 
+          "plotFeatureQC().")
+}
+
+
+#' @rdname plotObsQC
+#' @param ... Not used.
+#' @export
+plotSpotQC <- function(...) {
+  # message when using deprecated function name
+  message("The function plotSpotQC() has been replaced with plotObsQC(). Please ", 
+          "use the new function name.")
 }
